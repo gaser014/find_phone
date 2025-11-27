@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Find Phone</string>
+    <string name="accessibility_service_description">خدمة حماية الجهاز من السرقة. تراقب التطبيقات والأحداث لحماية جهازك من الوصول غير المصرح به.</string>
+    <string name="device_admin_description">تطبيق حماية من السرقة يحتاج صلاحيات المسؤول لحماية جهازك من السرقة والوصول غير المصرح به.</string>
+</resources>

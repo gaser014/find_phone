@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Backup rules for Anti-Theft Protection App
+   Requirement 22.1: Disable Android backup for app data in manifest
+   
+   This file specifies which data should NOT be backed up to prevent
+   sensitive security data from being extracted.
+-->
+<full-backup-content>
+    <!-- Exclude all sensitive data from backup -->
+    <exclude domain="sharedpref" path="."/>
+    <exclude domain="database" path="."/>
+    <exclude domain="file" path="."/>
+    <exclude domain="external" path="."/>
+    
+    <!-- Specifically exclude security-related files -->
+    <exclude domain="sharedpref" path="protection_service_prefs.xml"/>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+    <exclude domain="database" path="security_logs.db"/>
+    <exclude domain="file" path="security_photos"/>
+    <exclude domain="file" path="audio_recordings"/>
+</full-backup-content>
