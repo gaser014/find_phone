@@ -47,6 +47,8 @@ class SecurityEventTile extends StatelessWidget {
                         fontSize: 14,
                         color: isUnauthorizedAccess ? Colors.red.shade700 : null,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -59,37 +61,50 @@ class SecurityEventTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatTimestamp(event.timestamp),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                        if (event.location != null) ...[
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.location_on,
-                            size: 12,
-                            color: Colors.grey.shade500,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            'موقع متاح',
-                            style: TextStyle(
-                              fontSize: 11,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 12,
                               color: Colors.grey.shade500,
                             ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                _formatTimestamp(event.timestamp),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (event.location != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 12,
+                                color: Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                'موقع متاح',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
                       ],
                     ),
                   ],
@@ -117,7 +132,7 @@ class SecurityEventTile extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(

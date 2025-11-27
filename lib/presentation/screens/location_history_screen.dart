@@ -303,6 +303,8 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
                   child: Text(
                     'تفاصيل الموقع',
                     style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 IconButton(
@@ -324,16 +326,16 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
             if (location.address != null)
               _buildDetailRow('العنوان', location.address!),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openInMaps(location),
-                    icon: const Icon(Icons.map, size: 16),
-                    label: const Text('فتح في الخرائط'),
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openInMaps(location),
+                icon: const Icon(Icons.map, size: 16),
+                label: const Text(
+                  'فتح في الخرائط',
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -361,6 +363,8 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
             child: Text(
               value,
               style: const TextStyle(fontSize: 12),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -442,6 +446,8 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
                   ? 'الموقع الأقدم'
                   : 'الموقع ${index + 1}',
           style: const TextStyle(fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,15 +455,19 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
             Text(
               DateFormat('yyyy/MM/dd HH:mm:ss', 'ar').format(location.timestamp),
               style: const TextStyle(fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               'الدقة: ${location.accuracy.toStringAsFixed(1)} متر',
               style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+        trailing: Wrap(
+          spacing: 0,
           children: [
             IconButton(
               icon: const Icon(Icons.map, size: 20),
@@ -466,11 +476,15 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
                 _goToLocation(location);
               },
               tooltip: 'عرض على الخريطة',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             ),
             IconButton(
               icon: const Icon(Icons.open_in_new, size: 20),
               onPressed: () => _openInMaps(location),
               tooltip: 'فتح في الخرائط',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             ),
           ],
         ),

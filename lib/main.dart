@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/di/di.dart';
 import 'core/utils/memory_optimizer.dart';
@@ -100,10 +101,15 @@ class _AntiTheftAppState extends State<AntiTheftApp> with WidgetsBindingObserver
       title: 'حماية من السرقة',
       debugShowCheckedModeBanner: false,
       // RTL support for Arabic
-      locale: const Locale('ar', 'SA'),
+      locale: const Locale('ar'),
       supportedLocales: const [
-        Locale('ar', 'SA'),
-        Locale('en', 'US'),
+        Locale('ar'),
+        Locale('en'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
       ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

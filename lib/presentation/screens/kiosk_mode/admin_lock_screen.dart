@@ -212,7 +212,7 @@ class _AdminLockScreenState extends State<AdminLockScreen>
             color: Colors.red.shade900,
             boxShadow: [
               BoxShadow(
-                color: Colors.red.withOpacity(0.3),
+                color: Colors.red.withValues(alpha: 0.3),
                 blurRadius: 20,
                 spreadRadius: 5,
               ),
@@ -260,7 +260,7 @@ class _AdminLockScreenState extends State<AdminLockScreen>
       constraints: const BoxConstraints(maxWidth: 400),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.grey.shade800,
@@ -281,6 +281,8 @@ class _AdminLockScreenState extends State<AdminLockScreen>
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -297,6 +299,8 @@ class _AdminLockScreenState extends State<AdminLockScreen>
                     color: Colors.grey.shade400,
                     fontSize: 14,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -313,6 +317,8 @@ class _AdminLockScreenState extends State<AdminLockScreen>
                     color: Colors.red.shade400,
                     fontSize: 14,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -335,6 +341,7 @@ class _AdminLockScreenState extends State<AdminLockScreen>
               color: Colors.grey.shade400,
               fontSize: 14,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           TextField(
@@ -347,7 +354,7 @@ class _AdminLockScreenState extends State<AdminLockScreen>
               hintText: 'Password',
               hintStyle: TextStyle(color: Colors.grey.shade600),
               filled: true,
-              fillColor: Colors.white.withOpacity(0.08),
+              fillColor: Colors.white.withValues(alpha: 0.08),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -376,7 +383,7 @@ class _AdminLockScreenState extends State<AdminLockScreen>
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                disabledBackgroundColor: Colors.red.shade900.withOpacity(0.5),
+                disabledBackgroundColor: Colors.red.shade900.withValues(alpha: 0.5),
               ),
               child: _isLoading
                   ? const SizedBox(
@@ -404,6 +411,7 @@ class _AdminLockScreenState extends State<AdminLockScreen>
                 color: Colors.red.shade400,
                 fontSize: 14,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ],

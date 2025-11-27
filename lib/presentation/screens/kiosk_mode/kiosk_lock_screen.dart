@@ -193,7 +193,7 @@ class _KioskLockScreenState extends State<KioskLockScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.3),
+            color: Colors.blue.withValues(alpha: 0.3),
             blurRadius: 20,
             spreadRadius: 5,
           ),
@@ -244,7 +244,7 @@ class _KioskLockScreenState extends State<KioskLockScreen>
           hintText: 'كلمة المرور',
           hintStyle: TextStyle(color: Colors.grey.shade600),
           filled: true,
-          fillColor: Colors.white.withOpacity(0.1),
+          fillColor: Colors.white.withValues(alpha: 0.1),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -314,7 +314,7 @@ class _KioskLockScreenState extends State<KioskLockScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.2),
+        color: Colors.red.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -322,9 +322,13 @@ class _KioskLockScreenState extends State<KioskLockScreen>
         children: [
           const Icon(Icons.error_outline, color: Colors.red, size: 20),
           const SizedBox(width: 8),
-          Text(
-            _errorMessage!,
-            style: const TextStyle(color: Colors.red),
+          Flexible(
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
           ),
         ],
       ),

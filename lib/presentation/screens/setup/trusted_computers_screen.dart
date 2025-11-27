@@ -393,7 +393,13 @@ class _TrustedComputersScreenState extends State<TrustedComputersScreen> {
         ),
         title: Row(
           children: [
-            Expanded(child: Text(device.deviceName ?? 'جهاز غير معروف')),
+            Expanded(
+              child: Text(
+                device.deviceName ?? 'جهاز غير معروف',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (isCurrentDevice)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -417,10 +423,14 @@ class _TrustedComputersScreenState extends State<TrustedComputersScreen> {
             Text(
               'تمت الإضافة: ${dateFormat.format(device.addedAt)}',
               style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               'المعرف: ${device.deviceId.substring(0, device.deviceId.length.clamp(0, 20))}...',
               style: TextStyle(color: Colors.grey[500], fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

@@ -186,7 +186,7 @@ class _KioskPasswordEntryState extends State<KioskPasswordEntry>
               hintText: 'كلمة المرور',
               hintStyle: TextStyle(color: Colors.grey.shade600),
               filled: true,
-              fillColor: Colors.white.withOpacity(0.1),
+              fillColor: Colors.white.withValues(alpha: 0.1),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -331,8 +331,8 @@ class _KioskPasswordEntryState extends State<KioskPasswordEntry>
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isSpecial
-                ? Colors.grey.shade800.withOpacity(0.5)
-                : Colors.white.withOpacity(0.1),
+                ? Colors.grey.shade800.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.1),
             border: Border.all(
               color: Colors.grey.shade700,
               width: 1,
@@ -363,7 +363,7 @@ class _KioskPasswordEntryState extends State<KioskPasswordEntry>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.2),
+        color: Colors.red.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -371,9 +371,13 @@ class _KioskPasswordEntryState extends State<KioskPasswordEntry>
         children: [
           const Icon(Icons.error_outline, color: Colors.red, size: 18),
           const SizedBox(width: 8),
-          Text(
-            _errorMessage!,
-            style: const TextStyle(color: Colors.red, fontSize: 14),
+          Flexible(
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red, fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
           ),
         ],
       ),

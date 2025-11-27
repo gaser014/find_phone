@@ -217,46 +217,21 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
     String title = 'تأكيد كلمة المرور',
     String message = 'أدخل كلمة المرور الرئيسية للمتابعة',
   }) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
+    String? enteredPassword;
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: Text(title),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(message),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'كلمة المرور',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock),
-                ),
-                autofocus: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, controller.text),
-              child: const Text('تأكيد'),
-            ),
-          ],
-        ),
+      builder: (dialogContext) => _PasswordInputDialog(
+        title: title,
+        message: message,
+        onSubmit: (password) {
+          enteredPassword = password;
+          Navigator.pop(dialogContext);
+        },
+        onCancel: () => Navigator.pop(dialogContext),
       ),
     );
-    controller.dispose();
-    return result;
+    return enteredPassword;
   }
 
   /// Handles configuration toggle changes
@@ -550,6 +525,72 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
               value,
               (config, v) => config.copyWith(audioRecordingEnabled: v),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Separate stateful widget for password input dialog to properly manage TextEditingController
+class _PasswordInputDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final void Function(String password) onSubmit;
+  final VoidCallback onCancel;
+
+  const _PasswordInputDialog({
+    required this.title,
+    required this.message,
+    required this.onSubmit,
+    required this.onCancel,
+  });
+
+  @override
+  State<_PasswordInputDialog> createState() => _PasswordInputDialogState();
+}
+
+class _PasswordInputDialogState extends State<_PasswordInputDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: Text(widget.title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.message),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'كلمة المرور',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock),
+              ),
+              autofocus: true,
+              onSubmitted: (_) => widget.onSubmit(_controller.text),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: widget.onCancel,
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => widget.onSubmit(_controller.text),
+            child: const Text('تأكيد'),
           ),
         ],
       ),

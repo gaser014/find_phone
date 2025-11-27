@@ -48,6 +48,8 @@ class CallLogTile extends StatelessWidget {
                                   ? Colors.green.shade700 
                                   : null,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (callLog.isEmergencyContact)
@@ -72,10 +74,11 @@ class CallLogTile extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
                         _buildCallTypeChip(),
-                        const SizedBox(width: 8),
                         Text(
                           callLog.formattedDuration,
                           style: TextStyle(
@@ -94,11 +97,14 @@ class CallLogTile extends StatelessWidget {
                           color: Colors.grey.shade500,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          _formatTimestamp(callLog.timestamp),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade500,
+                        Flexible(
+                          child: Text(
+                            _formatTimestamp(callLog.timestamp),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -122,7 +128,7 @@ class CallLogTile extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
@@ -140,9 +146,9 @@ class CallLogTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,

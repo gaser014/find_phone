@@ -595,65 +595,79 @@ class _TestModeScreenState extends State<TestModeScreen> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(8),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildTestButton(
-              'الإنذار',
-              Icons.volume_up,
-              _testAlarm,
-              Colors.red,
-            ),
-            _buildTestButton(
-              'الكاميرا',
-              Icons.camera_alt,
-              _testCamera,
-              Colors.purple,
-            ),
-            _buildTestButton(
-              'الموقع',
-              Icons.location_on,
-              _testLocation,
-              Colors.blue,
-            ),
-            _buildTestButton(
-              'SMS',
-              Icons.sms,
-              _testSmsSending,
-              Colors.green,
-            ),
-            _buildTestButton(
-              'مدير الجهاز',
-              Icons.admin_panel_settings,
-              _testDeviceAdmin,
-              Colors.orange,
-            ),
-            _buildTestButton(
-              'إمكانية الوصول',
-              Icons.accessibility,
-              _testAccessibility,
-              Colors.teal,
-            ),
-            _buildTestButton(
-              'وضع الحماية',
-              Icons.shield,
-              _testProtectedMode,
-              Colors.indigo,
-            ),
-            _buildTestButton(
-              'وضع Kiosk',
-              Icons.lock,
-              _testKioskMode,
-              Colors.brown,
-            ),
-            _buildTestButton(
-              'مراقبة SIM',
-              Icons.sim_card,
-              _testSimMonitoring,
-              Colors.cyan,
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final buttonWidth = (constraints.maxWidth - 24) / 3;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildTestButton(
+                  'الإنذار',
+                  Icons.volume_up,
+                  _testAlarm,
+                  Colors.red,
+                  buttonWidth,
+                ),
+                _buildTestButton(
+                  'الكاميرا',
+                  Icons.camera_alt,
+                  _testCamera,
+                  Colors.purple,
+                  buttonWidth,
+                ),
+                _buildTestButton(
+                  'الموقع',
+                  Icons.location_on,
+                  _testLocation,
+                  Colors.blue,
+                  buttonWidth,
+                ),
+                _buildTestButton(
+                  'SMS',
+                  Icons.sms,
+                  _testSmsSending,
+                  Colors.green,
+                  buttonWidth,
+                ),
+                _buildTestButton(
+                  'مدير الجهاز',
+                  Icons.admin_panel_settings,
+                  _testDeviceAdmin,
+                  Colors.orange,
+                  buttonWidth,
+                ),
+                _buildTestButton(
+                  'إمكانية الوصول',
+                  Icons.accessibility,
+                  _testAccessibility,
+                  Colors.teal,
+                  buttonWidth,
+                ),
+                _buildTestButton(
+                  'وضع الحماية',
+                  Icons.shield,
+                  _testProtectedMode,
+                  Colors.indigo,
+                  buttonWidth,
+                ),
+                _buildTestButton(
+                  'وضع Kiosk',
+                  Icons.lock,
+                  _testKioskMode,
+                  Colors.brown,
+                  buttonWidth,
+                ),
+                _buildTestButton(
+                  'مراقبة SIM',
+                  Icons.sim_card,
+                  _testSimMonitoring,
+                  Colors.cyan,
+                  buttonWidth,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -664,15 +678,16 @@ class _TestModeScreenState extends State<TestModeScreen> {
     IconData icon,
     VoidCallback onPressed,
     Color color,
+    double width,
   ) {
     return SizedBox(
-      width: 100,
+      width: width.clamp(80, 120),
       child: ElevatedButton(
         onPressed: _isRunningTest || _isRunningAllTests ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -683,6 +698,8 @@ class _TestModeScreenState extends State<TestModeScreen> {
               label,
               style: const TextStyle(fontSize: 11),
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -694,15 +711,20 @@ class _TestModeScreenState extends State<TestModeScreen> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(8),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildSmsCommandButton('LOCK', RemoteCommandType.lock, Colors.orange),
-            _buildSmsCommandButton('LOCATE', RemoteCommandType.locate, Colors.blue),
-            _buildSmsCommandButton('ALARM', RemoteCommandType.alarm, Colors.red),
-            _buildSmsCommandButton('WIPE', RemoteCommandType.wipe, Colors.grey),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final buttonWidth = (constraints.maxWidth - 32) / 4;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildSmsCommandButton('LOCK', RemoteCommandType.lock, Colors.orange, buttonWidth),
+                _buildSmsCommandButton('LOCATE', RemoteCommandType.locate, Colors.blue, buttonWidth),
+                _buildSmsCommandButton('ALARM', RemoteCommandType.alarm, Colors.red, buttonWidth),
+                _buildSmsCommandButton('WIPE', RemoteCommandType.wipe, Colors.grey, buttonWidth),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -712,9 +734,10 @@ class _TestModeScreenState extends State<TestModeScreen> {
     String label,
     RemoteCommandType commandType,
     Color color,
+    double width,
   ) {
     return SizedBox(
-      width: 80,
+      width: width.clamp(60, 100),
       child: ElevatedButton(
         onPressed: _isRunningTest || _isRunningAllTests
             ? null
@@ -722,11 +745,12 @@ class _TestModeScreenState extends State<TestModeScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         ),
         child: Text(
           label,
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );
