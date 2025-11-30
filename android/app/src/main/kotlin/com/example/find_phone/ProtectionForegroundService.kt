@@ -72,6 +72,12 @@ class ProtectionForegroundService : Service() {
         }
     }
 
+    // Screen lock receiver for Kiosk on Lock
+    private var screenLockReceiver: ScreenLockReceiver? = null
+    
+    // USB connection receiver
+    private var usbConnectionReceiver: UsbConnectionReceiver? = null
+
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "ProtectionForegroundService created")
@@ -79,14 +85,103 @@ class ProtectionForegroundService : Service() {
         
         createNotificationChannel()
         registerCommandReceiver()
+        registerScreenLockReceiver()
+        registerUsbConnectionReceiver()
         loadState()
         
         // Record service start
         recordServiceStart()
     }
 
+    /**
+     * Register screen lock receiver for Kiosk on Lock feature
+     */
+    private fun registerScreenLockReceiver() {
+        if (screenLockReceiver != null) {
+            Log.i(TAG, "Screen lock receiver already registered")
+            return
+        }
+        
+        try {
+            screenLockReceiver = ScreenLockReceiver()
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenLockReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(screenLockReceiver, filter)
+            }
+            Log.i(TAG, "Screen lock receiver registered successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering screen lock receiver: ${e.message}")
+        }
+    }
+
+    /**
+     * Unregister screen lock receiver
+     */
+    private fun unregisterScreenLockReceiver() {
+        screenLockReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unregistering screen lock receiver: ${e.message}")
+            }
+            screenLockReceiver = null
+        }
+    }
+
+    /**
+     * Register USB connection receiver
+     */
+    private fun registerUsbConnectionReceiver() {
+        if (usbConnectionReceiver != null) {
+            Log.i(TAG, "USB connection receiver already registered")
+            return
+        }
+        
+        try {
+            usbConnectionReceiver = UsbConnectionReceiver()
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED)
+                addAction(android.hardware.usb.UsbManager.ACTION_USB_ACCESSORY_ATTACHED)
+            }
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(usbConnectionReceiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(usbConnectionReceiver, filter)
+            }
+            Log.i(TAG, "USB connection receiver registered successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering USB connection receiver: ${e.message}")
+        }
+    }
+
+    /**
+     * Unregister USB connection receiver
+     */
+    private fun unregisterUsbConnectionReceiver() {
+        usbConnectionReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unregistering USB connection receiver: ${e.message}")
+            }
+            usbConnectionReceiver = null
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "ProtectionForegroundService onStartCommand: ${intent?.action}")
+        
+        // Always start as foreground service first
+        startForeground(NOTIFICATION_ID, createNotification())
         
         when (intent?.action) {
             ACTION_START_PROTECTION -> {
@@ -99,9 +194,16 @@ class ProtectionForegroundService : Service() {
                 updateNotification()
             }
             else -> {
-                // Default: start protection if Protected Mode was active
-                if (shouldRestoreProtection()) {
-                    startProtection()
+                // Default: start protection
+                // Check if Kiosk on Lock is enabled
+                val kioskPrefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+                val kioskOnLockEnabled = kioskPrefs.getBoolean(ScreenLockReceiver.KEY_KIOSK_ON_LOCK_ENABLED, false)
+                
+                if (kioskOnLockEnabled || shouldRestoreProtection()) {
+                    Log.i(TAG, "Starting protection (Kiosk on Lock: $kioskOnLockEnabled)")
+                    isProtectedModeActive = true
+                    saveState()
+                    handler.post(heartbeatRunnable)
                 }
             }
         }
@@ -122,12 +224,15 @@ class ProtectionForegroundService : Service() {
         // Stop heartbeat
         handler.removeCallbacks(heartbeatRunnable)
         
-        // Unregister receiver
+        // Unregister receivers
         try {
             unregisterReceiver(commandReceiver)
         } catch (e: Exception) {
             Log.e(TAG, "Error unregistering receiver: ${e.message}")
         }
+        
+        unregisterScreenLockReceiver()
+        unregisterUsbConnectionReceiver()
         
         // If Protected Mode is active, this is a force-stop - log and restart
         if (isProtectedModeActive) {

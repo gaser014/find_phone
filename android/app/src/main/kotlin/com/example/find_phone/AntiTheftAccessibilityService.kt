@@ -176,6 +176,33 @@ class AntiTheftAccessibilityService : AccessibilityService() {
             intent?.let { handleDeviceAdminEvent(it) }
         }
     }
+    
+    // Screen lock receiver for Kiosk on Lock
+    private val screenLockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (context == null) return
+            
+            val prefs = context.getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+            val kioskOnLockEnabled = prefs.getBoolean(ScreenLockReceiver.KEY_KIOSK_ON_LOCK_ENABLED, false)
+            
+            if (!kioskOnLockEnabled) return
+            
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    Log.i(TAG, "Screen OFF detected in Accessibility Service")
+                    prefs.edit().putBoolean("kiosk_pending", true).apply()
+                }
+                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
+                    Log.i(TAG, "Screen ON/User Present detected in Accessibility Service")
+                    val kioskPending = prefs.getBoolean("kiosk_pending", false)
+                    if (kioskPending) {
+                        showKioskLockScreen()
+                    }
+                }
+            }
+        }
+    }
+    private var isScreenLockReceiverRegistered = false
 
     /**
      * Enum for pending actions after password verification
@@ -241,8 +268,58 @@ class AntiTheftAccessibilityService : AccessibilityService() {
             registerVolumeButtonListener()
         }
         
+        // Register screen lock receiver for Kiosk on Lock
+        registerScreenLockReceiver()
+        
         // Notify Flutter that service is connected
         notifyFlutter("SERVICE_CONNECTED")
+    }
+    
+    /**
+     * Register screen lock receiver
+     */
+    private fun registerScreenLockReceiver() {
+        if (isScreenLockReceiverRegistered) return
+        
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenLockReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(screenLockReceiver, filter)
+            }
+            isScreenLockReceiverRegistered = true
+            Log.i(TAG, "Screen lock receiver registered in Accessibility Service")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering screen lock receiver: ${e.message}")
+        }
+    }
+    
+    /**
+     * Show Kiosk Lock Screen
+     */
+    private fun showKioskLockScreen() {
+        mainHandler.post {
+            try {
+                val intent = Intent(this, KioskLockActivity::class.java)
+                intent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                )
+                startActivity(intent)
+                Log.i(TAG, "Kiosk Lock Screen launched from Accessibility Service")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error launching Kiosk Lock Screen: ${e.message}")
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -262,6 +339,15 @@ class AntiTheftAccessibilityService : AccessibilityService() {
             Log.e(TAG, "Error unregistering device admin event receiver: ${e.message}")
         }
         
+        try {
+            if (isScreenLockReceiverRegistered) {
+                unregisterReceiver(screenLockReceiver)
+                isScreenLockReceiverRegistered = false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering screen lock receiver: ${e.message}")
+        }
+        
         hidePasswordOverlay()
         
         // Notify Flutter that service is disconnected
@@ -269,7 +355,14 @@ class AntiTheftAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || !isProtectedModeActive) return
+        if (event == null) return
+        
+        // Check if Protected Mode OR Kiosk on Lock is active
+        val kioskPrefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        val kioskOnLockEnabled = kioskPrefs.getBoolean(ScreenLockReceiver.KEY_KIOSK_ON_LOCK_ENABLED, false)
+        val kioskPending = kioskPrefs.getBoolean("kiosk_pending", false)
+        
+        if (!isProtectedModeActive && !kioskOnLockEnabled && !kioskPending) return
         
         val packageName = event.packageName?.toString() ?: return
         val eventType = event.eventType
@@ -296,6 +389,17 @@ class AntiTheftAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Window state changed: $packageName")
         
         val className = event.className?.toString() ?: ""
+        
+        // Check if Kiosk Mode is pending - block ALL apps except our kiosk
+        val kioskPrefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        val kioskPending = kioskPrefs.getBoolean("kiosk_pending", false)
+        
+        if (kioskPending && packageName != "com.example.find_phone") {
+            Log.w(TAG, "Kiosk pending - blocking app: $packageName")
+            // Return to our kiosk lock screen
+            returnToKioskLockScreen()
+            return
+        }
         
         // Check for Settings app (Requirement 12.1, 27.1)
         if (blockSettings && isSettingsPackage(packageName)) {
@@ -502,8 +606,16 @@ class AntiTheftAccessibilityService : AccessibilityService() {
     private fun blockApp(packageName: String, reason: String) {
         Log.i(TAG, "Blocking app: $packageName, reason: $reason")
         
-        // Perform global action to go home
-        performGlobalAction(GLOBAL_ACTION_HOME)
+        // Check if kiosk is pending - return to kiosk screen instead of home
+        val kioskPrefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        val kioskPending = kioskPrefs.getBoolean("kiosk_pending", false)
+        
+        if (kioskPending) {
+            returnToKioskLockScreen()
+        } else {
+            // Perform global action to go home
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
         
         // Log the event
         logSecurityEvent(reason, mapOf(
@@ -523,6 +635,34 @@ class AntiTheftAccessibilityService : AccessibilityService() {
             ).show()
         }
     }
+    
+    /**
+     * Return to Kiosk Lock Screen
+     */
+    private fun returnToKioskLockScreen() {
+        Log.i(TAG, "Returning to Kiosk Lock Screen")
+        
+        // Press back first to dismiss any dialogs
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        
+        // Launch KioskLockActivity
+        mainHandler.postDelayed({
+            try {
+                val intent = Intent(this, KioskLockActivity::class.java)
+                intent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                )
+                startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error launching KioskLockActivity: ${e.message}")
+                // Fallback to home
+                performGlobalAction(GLOBAL_ACTION_HOME)
+            }
+        }, 100)
+    }
 
     /**
      * Block power menu
@@ -531,11 +671,27 @@ class AntiTheftAccessibilityService : AccessibilityService() {
     private fun blockPowerMenu() {
         Log.i(TAG, "Blocking power menu")
         
-        // Press back to dismiss power menu
+        // Press back multiple times to dismiss power menu
         performGlobalAction(GLOBAL_ACTION_BACK)
+        mainHandler.postDelayed({
+            performGlobalAction(GLOBAL_ACTION_BACK)
+        }, 50)
+        mainHandler.postDelayed({
+            performGlobalAction(GLOBAL_ACTION_BACK)
+        }, 100)
         
-        // Show password overlay
-        showPasswordOverlayForAction(PendingAction.DISABLE_PROTECTED_MODE)
+        // Check if kiosk is pending - return to kiosk screen
+        val kioskPrefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        val kioskPending = kioskPrefs.getBoolean("kiosk_pending", false)
+        
+        if (kioskPending) {
+            mainHandler.postDelayed({
+                returnToKioskLockScreen()
+            }, 150)
+        } else {
+            // Show password overlay
+            showPasswordOverlayForAction(PendingAction.DISABLE_PROTECTED_MODE)
+        }
         
         // Log the event
         logSecurityEvent("power_menu_blocked", mapOf(

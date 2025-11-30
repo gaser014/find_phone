@@ -36,6 +36,8 @@ class MainActivity : FlutterActivity() {
         private const val PROTECTION_EVENTS_CHANNEL = "com.example.find_phone/protection_events"
         private const val ALARM_CHANNEL = "com.example.find_phone/alarm"
         private const val KIOSK_CHANNEL = "com.example.find_phone/kiosk"
+        private const val KIOSK_ON_LOCK_CHANNEL = "com.example.find_phone/kiosk_on_lock"
+        private const val KIOSK_ON_LOCK_EVENTS_CHANNEL = "com.example.find_phone/kiosk_on_lock_events"
         private const val NOTIFICATION_CHANNEL = "com.example.find_phone/notifications"
         private const val USB_CHANNEL = "com.example.find_phone/usb"
         private const val WHATSAPP_CHANNEL = "com.example.find_phone/whatsapp"
@@ -46,8 +48,15 @@ class MainActivity : FlutterActivity() {
     private var bootEventSink: EventChannel.EventSink? = null
     private var deviceAdminEventSink: EventChannel.EventSink? = null
     private var protectionEventSink: EventChannel.EventSink? = null
+    private var kioskOnLockEventSink: EventChannel.EventSink? = null
     private var accessibilityEventReceiver: BroadcastReceiver? = null
     private var bootEventReceiver: BroadcastReceiver? = null
+    private var kioskOnLockEventReceiver: BroadcastReceiver? = null
+    
+    // Mobile Data Service
+    private val mobileDataService: MobileDataService by lazy {
+        MobileDataService.getInstance(this)
+    }
     private var deviceAdminEventReceiver: BroadcastReceiver? = null
     private var protectionEventReceiver: BroadcastReceiver? = null
     
@@ -499,6 +508,89 @@ class MainActivity : FlutterActivity() {
                     }
                 }
             }
+
+        // Setup Method Channel for Kiosk on Lock
+        // Enables Kiosk Mode when screen locks, with mobile data and USB blocking
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, KIOSK_ON_LOCK_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "enableKioskOnLock" -> {
+                        result.success(enableKioskOnLock())
+                    }
+                    "disableKioskOnLock" -> {
+                        result.success(disableKioskOnLock())
+                    }
+                    "isKioskOnLockEnabled" -> {
+                        result.success(isKioskOnLockEnabled())
+                    }
+                    "isServiceRunning" -> {
+                        result.success(ProtectionForegroundService.isServiceRunning())
+                    }
+                    "testKioskLockScreen" -> {
+                        // For testing - show the kiosk lock screen immediately
+                        showKioskLockScreenActivity()
+                        result.success(true)
+                    }
+                    "setAutoEnableMobileData" -> {
+                        val enable = call.argument<Boolean>("enable") ?: true
+                        result.success(setAutoEnableMobileData(enable))
+                    }
+                    "isAutoMobileDataEnabled" -> {
+                        result.success(isAutoMobileDataEnabled())
+                    }
+                    "showKioskLockScreen" -> {
+                        showKioskLockScreenActivity()
+                        result.success(true)
+                    }
+                    "unlockKiosk" -> {
+                        val password = call.argument<String>("password") ?: ""
+                        result.success(unlockKiosk(password))
+                    }
+                    "getConfiguration" -> {
+                        result.success(getKioskOnLockConfiguration())
+                    }
+                    "updateConfiguration" -> {
+                        val config = call.arguments as? Map<String, Any>
+                        result.success(updateKioskOnLockConfiguration(config))
+                    }
+                    "testTelegramConnection" -> {
+                        val botToken = call.argument<String>("botToken") ?: ""
+                        val chatId = call.argument<String>("chatId") ?: ""
+                        
+                        // Run in background thread
+                        Thread {
+                            val success = testTelegramConnection(botToken, chatId)
+                            runOnUiThread {
+                                result.success(success)
+                            }
+                        }.start()
+                    }
+                    "uninstallApp" -> {
+                        uninstallApp()
+                        result.success(true)
+                    }
+                    else -> {
+                        result.notImplemented()
+                    }
+                }
+            }
+
+        // Setup Event Channel for Kiosk on Lock Events
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, KIOSK_ON_LOCK_EVENTS_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    kioskOnLockEventSink = events
+                    registerKioskOnLockEventReceiver()
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    kioskOnLockEventSink = null
+                    unregisterKioskOnLockEventReceiver()
+                }
+            })
+        
+        // Initialize Mobile Data Service
+        mobileDataService.initialize()
 
         // Setup Method Channel for USB Service
         // Requirements: 28.1, 28.2, 28.3, 28.4, 28.5, 29.1, 29.2
@@ -1371,11 +1463,406 @@ class MainActivity : FlutterActivity() {
         sendBroadcast(intent)
     }
 
+    // ==================== Kiosk on Lock Methods ====================
+
+    /**
+     * Enable Kiosk Mode on screen lock
+     */
+    private fun enableKioskOnLock(): Boolean {
+        android.util.Log.i("MainActivity", "Enabling Kiosk on Lock")
+        
+        val prefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(ScreenLockReceiver.KEY_KIOSK_ON_LOCK_ENABLED, true)
+            .apply()
+        
+        // Start the protection foreground service to keep receiver alive
+        startProtectionService()
+        
+        // Register screen lock receiver dynamically in activity
+        registerScreenLockReceiver()
+        
+        android.util.Log.i("MainActivity", "Kiosk on Lock enabled successfully")
+        return true
+    }
+
+    /**
+     * Disable Kiosk Mode on screen lock
+     */
+    private fun disableKioskOnLock(): Boolean {
+        val prefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(ScreenLockReceiver.KEY_KIOSK_ON_LOCK_ENABLED, false)
+            .apply()
+        
+        return true
+    }
+
+    /**
+     * Check if Kiosk on Lock is enabled
+     */
+    private fun isKioskOnLockEnabled(): Boolean {
+        val prefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(ScreenLockReceiver.KEY_KIOSK_ON_LOCK_ENABLED, false)
+    }
+
+    /**
+     * Set auto enable mobile data
+     */
+    private fun setAutoEnableMobileData(enable: Boolean): Boolean {
+        val prefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(ScreenLockReceiver.KEY_AUTO_ENABLE_DATA, enable)
+            .apply()
+        return true
+    }
+
+    /**
+     * Check if auto mobile data is enabled
+     */
+    private fun isAutoMobileDataEnabled(): Boolean {
+        val prefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(ScreenLockReceiver.KEY_AUTO_ENABLE_DATA, true)
+    }
+
+    /**
+     * Show Kiosk Lock Screen Activity
+     */
+    private fun showKioskLockScreenActivity() {
+        val intent = Intent(this, KioskLockActivity::class.java)
+        intent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+            Intent.FLAG_ACTIVITY_SINGLE_TOP
+        )
+        startActivity(intent)
+    }
+
+    /**
+     * Unlock Kiosk with password
+     */
+    private fun unlockKiosk(password: String): Boolean {
+        // Verify password
+        val prefs = getSharedPreferences(
+            AntiTheftAccessibilityService.PREFS_NAME,
+            Context.MODE_PRIVATE
+        )
+        val storedHash = prefs.getString(AntiTheftAccessibilityService.KEY_PASSWORD_HASH, null)
+        val storedSalt = prefs.getString(AntiTheftAccessibilityService.KEY_PASSWORD_SALT, null)
+        
+        if (storedHash == null || storedSalt == null) {
+            // No password set, check default
+            if (password == "123456") {
+                sendKioskUnlockBroadcast()
+                return true
+            }
+            return false
+        }
+        
+        val inputHash = hashPassword(password, storedSalt)
+        if (inputHash == storedHash) {
+            sendKioskUnlockBroadcast()
+            return true
+        }
+        
+        return false
+    }
+
+    /**
+     * Hash password with salt
+     */
+    private fun hashPassword(password: String, salt: String): String {
+        val combined = password + salt
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(combined.toByteArray())
+        return hashBytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Send unlock broadcast to KioskLockActivity
+     */
+    private fun sendKioskUnlockBroadcast() {
+        val intent = Intent("com.example.find_phone.KIOSK_UNLOCK")
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
+        
+        // Clear kiosk pending state
+        val prefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("kiosk_pending", false).apply()
+    }
+
+    /**
+     * Get Kiosk on Lock configuration
+     */
+    private fun getKioskOnLockConfiguration(): Map<String, Any> {
+        val prefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        val kioskPrefs = getSharedPreferences(KioskLockActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        
+        return mapOf(
+            "kioskOnLockEnabled" to prefs.getBoolean(ScreenLockReceiver.KEY_KIOSK_ON_LOCK_ENABLED, false),
+            "autoEnableMobileData" to prefs.getBoolean(ScreenLockReceiver.KEY_AUTO_ENABLE_DATA, true),
+            "blockUsbOnKiosk" to prefs.getBoolean("block_usb_on_kiosk", true),
+            "capturePhotoOnFailedAttempt" to prefs.getBoolean("capture_photo_on_failed", true),
+            "triggerAlarmOnMultipleFailures" to prefs.getBoolean("trigger_alarm_on_failures", true),
+            "alarmTriggerThreshold" to prefs.getInt("alarm_trigger_threshold", 3),
+            "emergencyNumber1" to (kioskPrefs.getString(KioskLockActivity.KEY_EMERGENCY_PHONE, "") ?: ""),
+            "telegramBotToken" to (kioskPrefs.getString(KioskLockActivity.KEY_TELEGRAM_BOT_TOKEN, "") ?: ""),
+            "telegramChatId" to (kioskPrefs.getString(KioskLockActivity.KEY_TELEGRAM_CHAT_ID, "") ?: ""),
+            "kioskPassword" to (kioskPrefs.getString(KioskLockActivity.KEY_KIOSK_PASSWORD, "123456") ?: "123456")
+        )
+    }
+
+    /**
+     * Update Kiosk on Lock configuration
+     */
+    private fun updateKioskOnLockConfiguration(config: Map<String, Any>?): Boolean {
+        if (config == null) return false
+        
+        val prefs = getSharedPreferences(ScreenLockReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        val kioskPrefs = getSharedPreferences(KioskLockActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        val kioskEditor = kioskPrefs.edit()
+        
+        config["kioskOnLockEnabled"]?.let {
+            editor.putBoolean(ScreenLockReceiver.KEY_KIOSK_ON_LOCK_ENABLED, it as Boolean)
+        }
+        config["autoEnableMobileData"]?.let {
+            editor.putBoolean(ScreenLockReceiver.KEY_AUTO_ENABLE_DATA, it as Boolean)
+        }
+        config["blockUsbOnKiosk"]?.let {
+            editor.putBoolean("block_usb_on_kiosk", it as Boolean)
+        }
+        config["capturePhotoOnFailedAttempt"]?.let {
+            editor.putBoolean("capture_photo_on_failed", it as Boolean)
+        }
+        config["triggerAlarmOnMultipleFailures"]?.let {
+            editor.putBoolean("trigger_alarm_on_failures", it as Boolean)
+        }
+        config["alarmTriggerThreshold"]?.let {
+            editor.putInt("alarm_trigger_threshold", (it as Number).toInt())
+        }
+        
+        // Telegram settings
+        config["emergencyNumber1"]?.let {
+            kioskEditor.putString(KioskLockActivity.KEY_EMERGENCY_PHONE, it as String)
+        }
+        config["telegramBotToken"]?.let {
+            kioskEditor.putString(KioskLockActivity.KEY_TELEGRAM_BOT_TOKEN, it as String)
+        }
+        config["telegramChatId"]?.let {
+            kioskEditor.putString(KioskLockActivity.KEY_TELEGRAM_CHAT_ID, it as String)
+        }
+        
+        // Kiosk password
+        config["kioskPassword"]?.let {
+            kioskEditor.putString(KioskLockActivity.KEY_KIOSK_PASSWORD, it as String)
+        }
+        
+        editor.apply()
+        kioskEditor.apply()
+        return true
+    }
+    
+    /**
+     * Test Telegram connection
+     */
+    private fun testTelegramConnection(botToken: String, chatId: String): Boolean {
+        return try {
+            val url = java.net.URL("https://api.telegram.org/bot$botToken/sendMessage?chat_id=$chatId&text=${java.net.URLEncoder.encode("✅ اختبار الاتصال ناجح!", "UTF-8")}")
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+            
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            
+            responseCode == 200
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Telegram test failed: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Register screen lock receiver dynamically
+     */
+    private var screenLockReceiver: ScreenLockReceiver? = null
+    
+    private fun registerScreenLockReceiver() {
+        if (screenLockReceiver != null) return
+        
+        screenLockReceiver = ScreenLockReceiver()
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        registerReceiver(screenLockReceiver, filter)
+    }
+
+    /**
+     * Register Kiosk on Lock event receiver
+     */
+    private fun registerKioskOnLockEventReceiver() {
+        if (kioskOnLockEventReceiver != null) return
+        
+        kioskOnLockEventReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                intent?.let { handleKioskOnLockEvent(it) }
+            }
+        }
+        
+        val filter = IntentFilter().apply {
+            addAction("com.example.find_phone.KIOSK_EVENT")
+            addAction("com.example.find_phone.DATA_EVENT")
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(kioskOnLockEventReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(kioskOnLockEventReceiver, filter)
+        }
+    }
+
+    /**
+     * Unregister Kiosk on Lock event receiver
+     */
+    private fun unregisterKioskOnLockEventReceiver() {
+        kioskOnLockEventReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                // Receiver not registered
+            }
+            kioskOnLockEventReceiver = null
+        }
+    }
+
+    /**
+     * Handle Kiosk on Lock events
+     */
+    private fun handleKioskOnLockEvent(intent: Intent) {
+        val eventData = mutableMapOf<String, Any?>()
+        
+        eventData["action"] = intent.getStringExtra("action") ?: intent.action
+        eventData["timestamp"] = intent.getLongExtra("timestamp", System.currentTimeMillis())
+        
+        intent.extras?.let { extras ->
+            for (key in extras.keySet()) {
+                if (key != "action" && key != "timestamp") {
+                    eventData[key] = extras.get(key)
+                }
+            }
+        }
+        
+        kioskOnLockEventSink?.success(eventData)
+    }
+
+    /**
+     * Uninstall the app
+     */
+    private fun uninstallApp() {
+        try {
+            // Disable kiosk on lock first
+            disableKioskOnLock()
+            
+            // Stop protection service
+            stopProtectionService()
+            
+            // Mark uninstall as requested - this allows device admin deactivation
+            DeviceAdminReceiver.requestUninstall(this)
+            
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+            val componentName = android.content.ComponentName(this, DeviceAdminReceiver::class.java)
+            
+            // Check if Device Owner
+            val isDeviceOwner = try {
+                dpm.isDeviceOwnerApp(packageName)
+            } catch (e: Exception) {
+                false
+            }
+            
+            // Check if Profile Owner
+            val isProfileOwner = try {
+                dpm.isProfileOwnerApp(packageName)
+            } catch (e: Exception) {
+                false
+            }
+            
+            android.util.Log.d("MainActivity", "isDeviceOwner: $isDeviceOwner, isProfileOwner: $isProfileOwner, isAdmin: ${dpm.isAdminActive(componentName)}")
+            
+            // Clear Device Owner first
+            if (isDeviceOwner) {
+                try {
+                    android.util.Log.d("MainActivity", "Clearing Device Owner status")
+                    dpm.clearDeviceOwnerApp(packageName)
+                    android.widget.Toast.makeText(this, "تم إزالة Device Owner", android.widget.Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error clearing device owner: ${e.message}")
+                }
+            }
+            
+            // Clear Profile Owner
+            if (isProfileOwner) {
+                try {
+                    android.util.Log.d("MainActivity", "Clearing Profile Owner status")
+                    dpm.clearProfileOwner(componentName)
+                    android.widget.Toast.makeText(this, "تم إزالة Profile Owner", android.widget.Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error clearing profile owner: ${e.message}")
+                }
+            }
+            
+            // Remove active admin
+            if (dpm.isAdminActive(componentName)) {
+                try {
+                    android.util.Log.d("MainActivity", "Removing active admin")
+                    dpm.removeActiveAdmin(componentName)
+                    android.widget.Toast.makeText(this, "تم إزالة Device Admin", android.widget.Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error removing admin: ${e.message}")
+                }
+            }
+            
+            // Delay then request uninstall
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    val intent = Intent(Intent.ACTION_DELETE)
+                    intent.data = android.net.Uri.parse("package:$packageName")
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error starting uninstall: ${e.message}")
+                    // Fallback - open app info
+                    val appInfoIntent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    appInfoIntent.data = android.net.Uri.parse("package:$packageName")
+                    appInfoIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startActivity(appInfoIntent)
+                }
+            }, 1500)
+            
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error uninstalling app: ${e.message}")
+            android.widget.Toast.makeText(this, "خطأ: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         unregisterAccessibilityEventReceiver()
         unregisterBootEventReceiver()
         unregisterDeviceAdminEventReceiver()
         unregisterProtectionEventReceiver()
+        unregisterKioskOnLockEventReceiver()
+        mobileDataService.dispose()
+        
+        screenLockReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
     }
 }

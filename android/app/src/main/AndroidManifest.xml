@@ -49,6 +49,10 @@
     <!-- USB Detection -->
     <uses-permission android:name="android.permission.USB_PERMISSION" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    
+    <!-- Mobile Data Control (requires system app or Device Owner) -->
+    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
 
     <application
         android:label="find_phone"
@@ -92,7 +96,7 @@
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data
                 android:name="android.app.device_admin"
-                android:resource="@xml/device_admin_policies" />
+                android:resource="@xml/device_admin" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
@@ -160,6 +164,22 @@
             </intent-filter>
         </receiver>
         
+        <!-- Screen Lock/Unlock Receiver for Kiosk Mode -->
+        <!-- NOTE: SCREEN_OFF and SCREEN_ON must be registered dynamically, not in manifest -->
+        <!-- The ProtectionForegroundService registers this receiver when running -->
+        
+        <!-- USB Connection Receiver -->
+        <receiver
+            android:name=".UsbConnectionReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+                <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
+            </intent-filter>
+        </receiver>
+        
         <!-- Accessibility Service -->
         <service
             android:name=".AntiTheftAccessibilityService"
@@ -185,6 +205,21 @@
             android:name=".AutoRestartJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        
+        <!-- Kiosk Lock Activity - Full screen lock on device unlock -->
+        <activity
+            android:name=".KioskLockActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize|stateVisible"
+            android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
         
         <!-- Flutter metadata -->
         <meta-data

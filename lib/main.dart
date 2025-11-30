@@ -9,6 +9,7 @@ import 'presentation/screens/setup/password_setup_screen.dart';
 import 'presentation/screens/security_logs_screen.dart';
 import 'presentation/screens/location_history_screen.dart';
 import 'presentation/screens/test_mode/test_mode_screen.dart';
+import 'presentation/screens/kiosk_mode/kiosk_on_lock_settings_screen.dart';
 import 'services/authentication/i_authentication_service.dart';
 import 'services/protection/i_protection_service.dart';
 import 'services/test_mode/i_test_mode_service.dart';
@@ -168,6 +169,7 @@ class _AntiTheftAppState extends State<AntiTheftApp> with WidgetsBindingObserver
               testModeService: sl<ITestModeService>(),
             ),
         '/settings': (context) => const SettingsPlaceholder(),
+        '/kiosk-on-lock-settings': (context) => const KioskOnLockSettingsScreen(),
       },
     );
   }

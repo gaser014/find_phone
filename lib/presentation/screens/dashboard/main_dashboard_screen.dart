@@ -391,6 +391,16 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             onChanged: _onStealthModeChanged,
             activeColor: Colors.purple,
           ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.screen_lock_portrait, color: Colors.teal),
+            title: const Text('Kiosk عند قفل الشاشة'),
+            subtitle: const Text('قفل الجهاز بكلمة المرور عند كل فتح'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.pushNamed(context, '/kiosk-on-lock-settings');
+            },
+          ),
         ],
       ),
     );
